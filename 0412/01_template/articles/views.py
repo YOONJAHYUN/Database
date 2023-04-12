@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from django.views.decorators.http import require_POST
 from .models import Article, Comment
 from .forms import ArticleForm, CommentForm
 
@@ -61,34 +62,35 @@ def update(request, pk):
 
 
 def comments_create(request, pk):
-    # 인증된 사용자일 경우
-    if request.user.is_authenticated:
-        article = Article.objects.get(pk=pk)
-        comment_form = CommentForm(request.POST)
-        if comment_form.is_valid():
-            comment = comment_form.save(commit=False)
-            comment.article = article
-            comment.user = request.user
-            comment.save()
-        return redirect('articles:detail', article.pk)
-    return redirect('accounts:login')
+    if not request.user.is_authenticated:
+        return redirect('accounts:login')
+
+    article = Article.objects.get(pk=pk)
+    comment_form = CommentForm(request.POST)
+    if comment_form.is_valid():
+        comment = comment_form.save(commit=False)
+        comment.article = article
+        comment.user = request.user
+        comment.save()
+    return redirect('articles:detail', article.pk)
 
 
 def comments_delete(request, pk, comment_pk):
-    if request.user.is_authenticated:
-        comment = Comment.objects.get(pk=comment_pk)
+    if not request.user.is_authenticated:
+        return redirect('accounts:login')
+    comment = Comment.objects.get(pk=comment_pk)
     if request.user == comment.user:
         comment.delete()
     return redirect('articles:detail', pk)
 
+
+@require_POST
 def likes(request, article_pk):
     if request.user.is_authenticated:
         article = Article.objects.get(pk=article_pk)
-
         if article.like_users.filter(pk=request.user.pk).exists():
             article.like_users.remove(request.user)
         else:
             article.like_users.add(request.user)
         return redirect('articles:index')
     return redirect('accounts:login')
-
